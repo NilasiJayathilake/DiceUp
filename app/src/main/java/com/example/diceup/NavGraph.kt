@@ -1,10 +1,13 @@
 package com.example.diceup
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+
+import com.example.diceup.HomeScreen
+import com.example.diceup.Screen
+import com.example.diceup.GameScreen
 
 @Composable
 fun SetUpNavGraph(
@@ -21,7 +24,7 @@ fun SetUpNavGraph(
         composable(
             route = Screen.Game.route
         ){
-            GameScreen()
+            GameScreen(navController = navController)
         }
     }
 }

@@ -8,13 +8,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 
-
-
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,25 +35,53 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 
 @Composable
-fun GameScreen(modifier: Modifier = Modifier) {
+fun GameScreen(navController: NavHostController, modifier: Modifier = Modifier) {
     var pcDiceList by remember { mutableStateOf(List(5){(1..6).random()}) }
     var userDiceList by remember { mutableStateOf(List(5){(1..6).random()}) }
     var userScore by remember { mutableStateOf(0) }
     var pcScore by remember { mutableStateOf(0) }
     var keepUserList by remember { mutableStateOf(List(5){false}) }
-
-
+    var userTurns by remember { mutableStateOf(0) }
+    var pcTurns by remember { mutableStateOf(0) }
     var rollCount by remember { mutableStateOf(1) } // Since one roll is already done at start
 
+    // Alert Box Variables
+    var showWinDialog by remember { mutableStateOf(false) }
+    var winnerMessage by remember { mutableStateOf("") }
+    var winnerColor by remember { mutableStateOf(Color.Unspecified) }
+    fun score(){
+        userScore += calculateScore(userDiceList)
+        pcScore += calculateScore(pcDiceList)
+        // If WON
+        val (message, color, won) = checkWinner(userScore, pcScore, userTurns, pcTurns, 101)
+        if (won) { winnerMessage = message
+            winnerColor = color
+            showWinDialog = true
+        } else {
+            // resetting
+            startNewTurn(
+                onUserDiceReset = { userDiceList = it },
+                onPCDiceReset = { pcDiceList = it },
+                onKeepListReset = { keepUserList = List(5) { false } },
+                onRollCountReset = { rollCount = 1 },
+                onTurnIncrement = {
+                    userTurns++
+                    pcTurns++
+                }
+            )
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(vertical = 32.dp),
         contentAlignment = Alignment.Center
     ) {
-        Box(modifier = Modifier.align(Alignment.TopEnd).offset(x=-2.dp)) {
+        Box(modifier = Modifier.align(Alignment.TopEnd).offset(x=(-2).dp)) {
             ScoreBoard(userScore = userScore, pcScore = pcScore)
         }
 
@@ -116,16 +142,15 @@ fun GameScreen(modifier: Modifier = Modifier) {
                             if (!keepUserList[index]) (1..6).random() else value
                             // If the Index of the Dice is NOT in the Keep List dice is re rolled
                         }
-
                         keepUserList = List(5) { false }
-
                         pcDiceList = applyComputerStrategy(pcDiceList)
                     }
-                        rollCount++;
+                        rollCount++
 
                     if (rollCount==3) {
-                        userScore += CalculateScore(userDiceList)
-                        pcScore += CalculateScore(pcDiceList)
+                        // Calling Score Function
+                        score()
+
                     }
                 },
                     enabled = rollCount<3
@@ -140,13 +165,34 @@ fun GameScreen(modifier: Modifier = Modifier) {
                             pcDiceList = applyComputerStrategy(pcDiceList)
                         }
                     }
-                    userScore += CalculateScore(userDiceList)
-                    pcScore += CalculateScore(pcDiceList)
+                   // Calling Score Function
+                    score()
 
                 }) { Text("Score") }
             }
 
             }
+        if (showWinDialog) {
+            AlertDialog(
+                onDismissRequest = {}, confirmButton = {
+                    Button(onClick = { showWinDialog = false // Optional: reset full game
+                        navController.popBackStack()
+                    }) {
+                        Text("Go Back")
+                    } },
+
+                title = {
+                    Text(
+                        text = winnerMessage,
+                        color = winnerColor,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
+                text = {
+                    Text("Game Over. Thanks for playing")
+                }
+            )
+        }
         }
     }
 
@@ -154,7 +200,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
 @Preview
 @Composable
 private fun PreviewGameScreen() {
-   GameScreen()
+   GameScreen(navController = rememberNavController())
 }
 
 @Composable
@@ -221,8 +267,8 @@ fun Player(userName: String, profilePicID: Int, modifier: Modifier = Modifier) {
     }
 }
 
-fun CalculateScore(diceList: List<Int>): Int {
-    return diceList.sum();
+fun calculateScore(diceList: List<Int>): Int {
+    return diceList.sum()
 }
 
 @Composable
@@ -256,11 +302,11 @@ fun ScoreBoard(userScore: Int, pcScore: Int) {
 }
 
 fun applyComputerStrategy(currentList: List<Int>): List<Int> {
-    val ReRoll = listOf(true, false).random()
-    if (ReRoll == false) {
-        return currentList;
+    val reRoll = listOf(true, false).random()
+    if (!reRoll) {
+        return currentList
     }
-    val noOfDiceToReRoll = (1..5).random(); // decides how many Dice to re roll
+    val noOfDiceToReRoll = (1..5).random() // decides how many Dice to re roll
     val diceToReRoll = (0..5).shuffled()
         .take(noOfDiceToReRoll) // picks a no of indexes from 1 to 5 randomly to be rerolled.
     return currentList.mapIndexed { index, value ->
@@ -269,4 +315,51 @@ fun applyComputerStrategy(currentList: List<Int>): List<Int> {
 
     }
 }
+
+fun checkWinner(userScore: Int, pcScore: Int, userTurns: Int, pcTurns: Int, maxScore: Int): Triple<String, Color, Boolean> {
+    // First check if PC or User achieved maxScore
+    if (userScore >= maxScore && (pcScore < maxScore)) {
+        return Triple("You Win!", Color.Green, true)
+    }
+    if (pcScore >= maxScore && (userScore < maxScore)) {
+        return Triple("You Lose :/ Better Luck Next Time", Color.Red, true)
+    }
+
+    // In case of both achieving the same score we check who achieved it in less turns
+    if (userScore >= maxScore && pcScore >= maxScore)  {
+        // Compare turns
+        return when {
+            userTurns < pcTurns -> Triple("You Win! That was Intense", Color.Green, true)
+            pcTurns < userTurns -> Triple("You Loose, Too Many Turns", Color.Red, true)
+            userScore > pcScore -> Triple("You Win!", Color.Green, true)
+            pcScore > userScore -> Triple("You Lose, Close Call", Color.Red, true)
+            else -> {
+                // Tie-breaker: both same score and same turns — sudden death roll
+                val userLast = List(5) { (1..6).random() }.sum()
+                val pcLast = List(5) { (1..6).random() }.sum()
+                if (userLast > pcLast)
+                    Triple("You Win (Tie Breaker)!", Color.Green, true)
+                else
+                    Triple("You Lose (Tie Breaker)", Color.Red, true)
+            }
+        }
+    }
+    return Triple(" ", Color.Transparent, false)
+}
+
+    fun startNewTurn(
+        onUserDiceReset: (List<Int>) -> Unit,
+        onPCDiceReset: (List<Int>) -> Unit,
+        onKeepListReset: () -> Unit,
+        onRollCountReset: () -> Unit,
+        onTurnIncrement: () -> Unit
+    ) {
+        onUserDiceReset(List(5) { (1..6).random() })
+        onPCDiceReset(List(5) { (1..6).random() })
+        onKeepListReset()
+        onRollCountReset()
+        onTurnIncrement()
+    }
+
+
 
