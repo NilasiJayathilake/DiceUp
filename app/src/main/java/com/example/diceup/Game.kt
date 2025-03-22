@@ -44,8 +44,9 @@ fun GameScreen(modifier: Modifier = Modifier) {
     var userDiceList by remember { mutableStateOf(List(5){(1..6).random()}) }
     var userScore by remember { mutableStateOf(0) }
     var pcScore by remember { mutableStateOf(0) }
-    var reRollUserList by remember { mutableStateOf(List(5){false}) }
-    var reRollPCList by remember { mutableStateOf(List(5){false })}
+    var keepUserList by remember { mutableStateOf(List(5){false}) }
+
+
     var rollCount by remember { mutableStateOf(1) } // Since one roll is already done at start
 
     Box(
@@ -74,7 +75,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
                 .offset(y = (-100).dp),
             horizontalArrangement = Arrangement.Center
         ) {
-            DiceRoll(pcDiceList, reRollPCList)
+            DiceRoll(pcDiceList, null)
         }
 
         // Third: Human Dice
@@ -84,8 +85,8 @@ fun GameScreen(modifier: Modifier = Modifier) {
                 .offset(y = 100.dp),
             horizontalArrangement = Arrangement.Center
         ) {
-            DiceRoll(userDiceList, reRollUserList,
-                onToggle = {index->reRollUserList = reRollUserList.toMutableList().apply { this[index] = !this[index] }})
+            DiceRoll(userDiceList, keepUserList,
+                onToggle = {index->keepUserList = keepUserList.toMutableList().apply { this[index] = !this[index] }})
         }
 
         // Bottom: Human Profile
@@ -95,30 +96,50 @@ fun GameScreen(modifier: Modifier = Modifier) {
                 .offset(x = (300).dp, y = 200.dp),
             horizontalArrangement = Arrangement.Center
         ) {
+
             Player(userName = "You", profilePicID = R.drawable.useravatar)
+
         }
+
         Column (modifier = Modifier.fillMaxWidth().offset(y= 300.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "Roll: $rollCount / 3",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
             Row(verticalAlignment = Alignment.CenterVertically) {
+
                 Button(onClick = {
                     if (rollCount <3) {
                         userDiceList = userDiceList.mapIndexed { index, value ->
-                            if (reRollUserList[index]) (1..6).random() else value
+                            if (!keepUserList[index]) (1..6).random() else value
+                            // If the Index of the Dice is NOT in the Keep List dice is re rolled
                         }
 
-                        reRollUserList = List(5) { false }
+                        keepUserList = List(5) { false }
 
-                        pcDiceList = List(5) { (1..6).random() }
-                        rollCount++;
+                        pcDiceList = applyComputerStrategy(pcDiceList)
                     }
-                    userScore += CalculateScore(userDiceList)
-                    pcScore += CalculateScore(pcDiceList)
+                        rollCount++;
 
-                }) {
+                    if (rollCount==3) {
+                        userScore += CalculateScore(userDiceList)
+                        pcScore += CalculateScore(pcDiceList)
+                    }
+                },
+                    enabled = rollCount<3
+                ) {
                     Text("Rethrow")
                 }
                 Spacer(modifier=Modifier.width(16.dp))
 
                 Button(onClick = {
+                    if (rollCount<3){ // If the rollCount is less than 3
+                        for (i in 1..(3-rollCount)) { // pc will roll 3-roll count times
+                            pcDiceList = applyComputerStrategy(pcDiceList)
+                        }
+                    }
                     userScore += CalculateScore(userDiceList)
                     pcScore += CalculateScore(pcDiceList)
 
@@ -137,7 +158,7 @@ private fun PreviewGameScreen() {
 }
 
 @Composable
-fun DiceRoll(diceList:List<Int>, reRollList:List<Boolean>, onToggle: (Int) -> Unit = {} ) {
+fun DiceRoll(diceList:List<Int>,  keepList: List<Boolean>? = null, onToggle: ((Int) -> Unit)? = null ) {
     val dice = listOf(
 //        R stands for resources- so we can access the resources of
         R.drawable.dice1,
@@ -160,9 +181,17 @@ fun DiceRoll(diceList:List<Int>, reRollList:List<Boolean>, onToggle: (Int) -> Un
             horizontalArrangement = Arrangement.Center
         ) {
             for ((index, num) in diceList.withIndex()) {
-                val isSelectedForReRoll = reRollList.getOrNull(index)
+                val notSelectedForReRoll = keepList?.getOrNull(index)
                 Column(modifier = Modifier
-                        .padding(8.dp).clickable { onToggle(index)}.border(width = 2.dp, color = if(isSelectedForReRoll == true) Color.Yellow else Color.Transparent),
+                        .padding(8.dp).then(
+                        if (onToggle != null)
+                            Modifier.clickable { onToggle(index) }
+                        else Modifier
+                    )
+                    .border(
+                        width = 2.dp,
+                        color = if (notSelectedForReRoll==true) Color.Yellow else Color.Transparent
+                    ),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Image(
@@ -223,6 +252,21 @@ fun ScoreBoard(userScore: Int, pcScore: Int) {
             Text("You", style = MaterialTheme.typography.labelSmall)
             Text("$userScore", style = MaterialTheme.typography.titleMedium)
         }
+    }
+}
+
+fun applyComputerStrategy(currentList: List<Int>): List<Int> {
+    val ReRoll = listOf(true, false).random()
+    if (ReRoll == false) {
+        return currentList;
+    }
+    val noOfDiceToReRoll = (1..5).random(); // decides how many Dice to re roll
+    val diceToReRoll = (0..5).shuffled()
+        .take(noOfDiceToReRoll) // picks a no of indexes from 1 to 5 randomly to be rerolled.
+    return currentList.mapIndexed { index, value ->
+        if (index in diceToReRoll) (1..6).random() else value // checks if the index is in
+                        // the diceToReRoll if it is generates a new value if not keeps the value as it is
+
     }
 }
 
