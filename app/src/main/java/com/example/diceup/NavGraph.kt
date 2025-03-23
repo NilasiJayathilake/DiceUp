@@ -11,7 +11,7 @@ import com.example.diceup.GameScreen
 
 @Composable
 fun SetUpNavGraph(
-    navController: NavHostController,
+    navController: NavHostController
 ) {
     NavHost(
         navController = navController,
