@@ -2,12 +2,10 @@ package com.example.diceup
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-
-import com.example.diceup.HomeScreen
-import com.example.diceup.Screen
-import com.example.diceup.GameScreen
+import androidx.navigation.navArgument
 
 @Composable
 fun SetUpNavGraph(
@@ -22,9 +20,15 @@ fun SetUpNavGraph(
         ) { HomeScreen(navController=navController) }
 
         composable(
-            route = Screen.Game.route
-        ){
-            GameScreen(navController = navController)
+            route = Screen.Game.route,
+            arguments = listOf(
+                navArgument("targetScore") { type = NavType.IntType },
+                navArgument("isHardMode") { type = NavType.BoolType }
+            )
+        ) {
+            val targetScore = it.arguments?.getInt("targetScore") ?: 101
+            val isHardMode = it.arguments?.getBoolean("isHardMode") ?: false
+            GameScreen(navController = navController, targetScore, isHardMode)
         }
     }
 }

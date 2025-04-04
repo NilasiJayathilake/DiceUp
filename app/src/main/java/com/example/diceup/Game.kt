@@ -44,7 +44,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 
 @Composable
-fun GameScreen(navController: NavHostController, modifier: Modifier = Modifier) {
+fun GameScreen(navController: NavHostController,targetScore:Int, isHardMode:Boolean, modifier: Modifier = Modifier) {
     var pcDiceList by rememberSaveable { mutableStateOf(List(5){(1..6).random()}) }
     var userDiceList by rememberSaveable  { mutableStateOf(List(5){(1..6).random()}) }
     var userScore by rememberSaveable  { mutableStateOf(0) }
@@ -65,7 +65,7 @@ fun GameScreen(navController: NavHostController, modifier: Modifier = Modifier) 
         userScore += calculateScore(userDiceList)
         pcScore += calculateScore(pcDiceList)
         // If WON
-        val result = checkWinner(userScore, pcScore, userTurns, pcTurns, 101)
+        val result = checkWinner(userScore, pcScore, userTurns, pcTurns, targetScore)
         if (result.won) {
             winnerMessage = result.message
             winnerColor = result.color
@@ -85,6 +85,16 @@ fun GameScreen(navController: NavHostController, modifier: Modifier = Modifier) 
             )
         }
     }
+    fun hardMode(isHardMode: Boolean){
+        if(isHardMode) {
+            val (newPCList, newKeepList) = applyEfficientComputerStrategy(pcDiceList, pcScore, userScore)
+            pcDiceList = newPCList
+            keepPCList = newKeepList
+    } else {
+            val (newUserList, newKeepList) = applyComputerStrategy(pcDiceList)
+            pcDiceList = newUserList
+            keepPCList = newKeepList
+    }}
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -144,11 +154,9 @@ fun GameScreen(navController: NavHostController, modifier: Modifier = Modifier) 
                             // If the Index of the Dice is NOT in the Keep List dice is re rolled
                         }
                         keepUserList = List(5) { false }
-//                        pcDiceList = applyComputerStrategy(pcDiceList)
 
-                        val (newPCList, newKeepList) = applyEfficientComputerStrategy(pcDiceList, pcScore, userScore)
-                        pcDiceList = newPCList
-                        keepPCList = newKeepList
+                        hardMode(isHardMode)
+
                     }
                         rollCount++
 
@@ -167,10 +175,7 @@ fun GameScreen(navController: NavHostController, modifier: Modifier = Modifier) 
                 Button(onClick = {
                     if (rollCount<3){ // If the rollCount is less than 3
                         for (i in 1..(3-rollCount)) { // pc will roll 3-roll count times
-//                            pcDiceList = applyComputerStrategy(pcDiceList)
-                            val (newPCList, newKeepList) = applyEfficientComputerStrategy(pcDiceList, pcScore, userScore)
-                            pcDiceList = newPCList
-                            keepPCList = newKeepList
+                            hardMode(isHardMode)
 
                         }
                     }
@@ -209,7 +214,7 @@ fun GameScreen(navController: NavHostController, modifier: Modifier = Modifier) 
 @Preview
 @Composable
 private fun PreviewGameScreen() {
-   GameScreen(navController = rememberNavController())
+   GameScreen(navController = rememberNavController(), targetScore = 101, isHardMode = false , )
 }
 
 @Composable
@@ -363,7 +368,7 @@ fun checkWinner(userScore: Int, pcScore: Int, userTurns: Int, pcTurns: Int, maxS
         onTurnIncrement()
     }
 
-fun applyComputerStrategy(currentList: List<Int>): Any {
+fun applyComputerStrategy(currentList: List<Int>): Pair<List<Int>, List<Boolean>> {
     val reRoll = listOf(true, false).random()
     if (!reRoll) {
         return Pair(currentList,List(5) { true })
